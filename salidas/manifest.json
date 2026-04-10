@@ -1,5 +1,5 @@
 {
-  "fecha_ejecucion": "2026-04-10T08:21:56",
+  "fecha_ejecucion": "2026-04-10T12:31:16",
   "rutas": {
     "centro-de-atencion-distrital-para-la-inclusion-social-cadis": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/centro-de-atencion-distrital-para-la-inclusion-social-cadis.gpkg",
     "centro-renacer": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/centro-renacer.gpkg",
@@ -262,7 +262,7 @@
     "oferta_discapacidad_secgeneral": {
       "tiene_geometria": true,
       "filas": 263,
-      "columnas": 27,
+      "columnas": 33,
       "nombres_columnas": [
         "geometry",
         "OBJECTID",
@@ -290,6 +290,12 @@
         "tramo_edad_atendido",
         "edades_array",
         "edades_lista",
+        "disc_visual",
+        "disc_auditiva",
+        "disc_fisica",
+        "disc_intelectual",
+        "disc_psicosocial",
+        "disc_multiple",
         "tematica_servicio"
       ]
     }

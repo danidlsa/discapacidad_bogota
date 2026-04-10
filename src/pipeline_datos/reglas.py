@@ -33,7 +33,8 @@ from .configuracion import (
 from .transformaciones import (
     incorporar_extras_sdis,
     incorporar_extras_secgeneral,
-    clasificar_tematica
+    clasificar_tematica,
+    agregar_flags_discapacidad
 )
 
 
@@ -154,6 +155,8 @@ def aplicar_reglas(
                     col_llave_gdf="ofer_nombr",
                     col_llave_extras="ofer_nombr",
                 )
+                obj = agregar_flags_discapacidad(obj,
+                                                 columnas_texto=["ofer_descr", "sect_nombr"])
 
                 
                 # Secretaría General: clasificación temática
