@@ -15,6 +15,9 @@ import requests
 import pandas as pd
 import geopandas as gpd
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 def descargar_capa_arcgis_a_gdf(
     url_capa: str,
@@ -29,15 +32,20 @@ def descargar_capa_arcgis_a_gdf(
     """
     Devuelve:
       - GeoDataFrame si existen geometrías
-      - DataFrame si NO existen geometrías (tablas / geometría nula), si devolver_df_si_no_hay_geom=True
-      - GeoDataFrame vacío (columna geometry) si la capa está vacía, si devolver_df_si_no_hay_geom=False
-
+      - DataFrame si NO existen geometrías (tablas / geometría nula),
+        si devolver_df_si_no_hay_geom=True
+      - GeoDataFrame vacío si la capa está vacía
     """
     s = sesion or requests.Session()
     s.headers.update({"User-Agent": "undp-data-fetch/1.0"})
 
     # --- metadata de la capa
-    info = s.get(url_capa, params={"f": "pjson"}, timeout=timeout)
+    info = s.get(
+        url_capa,
+        params={"f": "pjson"},
+        timeout=timeout,
+        verify=False,
+    )
     info.raise_for_status()
     info = info.json()
 
@@ -63,12 +71,22 @@ def descargar_capa_arcgis_a_gdf(
             "orderByFields": campo_oid,
         }
 
-        r = s.get(url_query, params=params, timeout=timeout)
+        r = s.get(
+            url_query,
+            params=params,
+            timeout=timeout,
+            verify=False,
+        )
 
         # fallback si f=geojson no es soportado
         if r.status_code >= 400:
             params["f"] = "json"
-            r = s.get(url_query, params=params, timeout=timeout)
+            r = s.get(
+                url_query,
+                params=params,
+                timeout=timeout,
+                verify=False,
+            )
 
         r.raise_for_status()
         data = r.json()
@@ -110,16 +128,15 @@ def descargar_capa_arcgis_a_gdf(
 
     # ---- construir salida de forma segura ----
     if not features:
-        # capa realmente vacía
-        empty = gpd.GeoDataFrame({"geometry": gpd.GeoSeries([], crs=f"EPSG:{sr_salida}")})
+        empty = gpd.GeoDataFrame(
+            {"geometry": gpd.GeoSeries([], crs=f"EPSG:{sr_salida}")}
+        )
         return empty
 
-    # separar features con y sin geometría
     feats_con_geom = [f for f in features if f.get("geometry") is not None]
     feats_sin_geom = [f for f in features if f.get("geometry") is None]
 
     if len(feats_con_geom) == 0:
-        # tabla no espacial o geometrías ausentes
         rows = [f.get("properties", {}) for f in feats_sin_geom]
         df = pd.DataFrame(rows)
         if devolver_df_si_no_hay_geom:
@@ -128,14 +145,11 @@ def descargar_capa_arcgis_a_gdf(
         empty = gpd.GeoDataFrame(df, geometry=gpd.GeoSeries([None] * len(df)))
         return empty
 
-    # GeoDataFrame solo con geometrías válidas
     gdf = gpd.GeoDataFrame.from_features(feats_con_geom)
 
-    # set CRS solo si hay geometría
     if gdf.geometry is not None and gdf.geometry.notna().any():
         gdf = gdf.set_crs(f"EPSG:{sr_salida}", allow_override=True)
 
-    # debug: cuántos registros se descartaron por no tener geometría
     gdf.attrs["descartados_sin_geometria"] = len(feats_sin_geom)
 
     return gdf
@@ -149,14 +163,35 @@ def extraer_primera_url(valor):
     return match.group(0) if match else None
 
 
-def cargar_fuentes_desde_csv(ruta_csv: str, columna_url: str = "URL Servicio Feature") -> pd.DataFrame:
+
+def cargar_fuentes_desde_csv(
+    ruta_csv,
+    columna_url="URL Servicio Feature",
+    sep=";",
+    encoding="utf-8",
+):
     """
-    Carga el CSV de fuentes (separado por comas) y crea:
-      - url_servicio_feature_clean: URL limpia desde columna_url
-     """
-    df = pd.read_csv(ruta_csv, sep=";")
+    Carga la tabla de fuentes desde CSV y extrae la URL limpia del servicio.
+    """
+    df = pd.read_csv(
+        ruta_csv,
+        sep=sep,
+        encoding=encoding,
+    )
+
     df["url_servicio_feature_clean"] = df[columna_url].apply(extraer_primera_url)
+
+    # id_capa estable
+    if "source_layer" in df.columns:
+        df["id_capa"] = df["source_layer"]
+    elif "Nombre de la capa" in df.columns:
+        df["id_capa"] = df["Nombre de la capa"]
+    else:
+        df["id_capa"] = [f"capa_{i}" for i in range(len(df))]
+
     return df
+
+
 
 
 def descargar_todas_las_capas(df_fuentes: pd.DataFrame) -> tuple[dict, dict]:

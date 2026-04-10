@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
+
 from .configuracion import (
     ruta_apoyo,
     ARCHIVO_EXTRAS_SDIS,
@@ -32,6 +33,7 @@ from .configuracion import (
 from .transformaciones import (
     incorporar_extras_sdis,
     incorporar_extras_secgeneral,
+    clasificar_tematica
 )
 
 
@@ -49,10 +51,60 @@ def es_capa_sdis(entidad: Any) -> bool:
     return ("integración social" in s) or ("integracion social" in s) or ("sdis" in s)
 
 
+
+
+# ---------------------------------------------------------------------
+# Filtro específico para Secretaría General
+# ---------------------------------------------------------------------
+
+def filtrar_secgeneral(obj: Any):
+    """
+    Filtrado específico para la capa de Secretaría General.
+
+    - Elimina registros sin geometría o con geometría vacía
+    - Excluye ofertas pertenecientes a secretarías que ya se procesan
+      como capas propias
+    """
+    # Si no es un GeoDataFrame, no hacemos nada
+    if not hasattr(obj, "geometry"):
+        return obj
+
+    # 1) Mantener solo geometría válida
+    obj = obj[
+        obj.geometry.notna() &
+        (~obj.geometry.is_empty)
+    ]
+
+    # 2) Excluir secretarías ya cubiertas por otras capas
+    if "sect_nombr" in obj.columns:
+        excluir = {
+            "Educación",
+            "Mujer",
+            "Integración Social",
+            "Inclusión Social y Reconciliación",
+        }
+        obj = obj[~obj["sect_nombr"].isin(excluir)]
+
+    return obj
+
+def filtrar_sdmujer(obj):
+    """
+    Filtrado específico para la capa de la Secretaría de la Mujer.
+    Solo conserva servicios dirigidos a cuidadoras y a sus familias/comunidad.
+    """
+    if "TIPO_SERVI" not in obj.columns:
+        return obj
+
+    valores_validos = {
+        "Para las Cuidadoras",
+        "Para familias de las cuidadoras y Comunidad",
+    }
+
+    return obj[obj["TIPO_SERVI"].isin(valores_validos)]
+
 # ---------------------------------------------------------------------
 # API principal
 # ---------------------------------------------------------------------
-
 def aplicar_reglas(
     capas: dict[str, Any],
     df_fuentes: pd.DataFrame,
@@ -63,21 +115,13 @@ def aplicar_reglas(
     """
     Aplica reglas de transformación sobre un dict {source_layer: gdf/df}.
 
-    Parámetros:
-    - capas: dict con resultados de ingesta (keys = source_layer)
-    - df_fuentes: DataFrame de fuentes con columnas:
-        - source_layer
-        - Entidad
-    - ruta_extras_sdis: ruta al CSV de extras SDIS
-    - ruta_extras_secgeneral: ruta al CSV de extras SecGeneral
-    - reglas_por_capa: dict opcional {source_layer: funcion} para reglas específicas adicionales
-
     Devuelve:
     - capas_transformadas
     - errores (si una regla falla, no rompe todo)
     """
     if ruta_extras_sdis is None:
         ruta_extras_sdis = str(ruta_apoyo(ARCHIVO_EXTRAS_SDIS))
+
     if ruta_extras_secgeneral is None:
         ruta_extras_secgeneral = str(ruta_apoyo(ARCHIVO_EXTRAS_SECGENERAL))
 
@@ -98,8 +142,12 @@ def aplicar_reglas(
             if source_layer in reglas_por_capa:
                 obj = reglas_por_capa[source_layer](obj)
 
-            # 1) Regla SecGeneral (por id de capa)
+            entidad = mapa_entidad.get(source_layer, None)
+            entidad_norm = str(entidad).lower() if entidad is not None else ""
+
+            # 1) Secretaría General (capa consolidada)
             if source_layer == SOURCE_LAYER_SECGENERAL:
+                obj = filtrar_secgeneral(obj)
                 obj = incorporar_extras_secgeneral(
                     obj,
                     ruta_csv_extras=ruta_extras_secgeneral,
@@ -107,14 +155,40 @@ def aplicar_reglas(
                     col_llave_extras="ofer_nombr",
                 )
 
-            # 2) Regla SDIS (por entidad)
-            entidad = mapa_entidad.get(source_layer, None)
-            if es_capa_sdis(entidad):
+                
+                # Secretaría General: clasificación temática
+                if "ofer_descr" in obj.columns and "sect_nombr" in obj.columns:
+                    obj["tematica_servicio"] = obj.apply(
+                        lambda r: clasificar_tematica(
+                            r["ofer_descr"],
+                            r["sect_nombr"],
+                            "Gobierno",
+                            "Secretaría General",
+                        ),
+                        axis=1,
+                    )
+                else:
+                    # fallback seguro (no debería ocurrir, pero evita vacíos)
+                    obj["tematica_servicio"] = "Otra oferta para personas con discapacidad"
+
+
+            # 2) SDIS
+            elif es_capa_sdis(entidad):
                 obj = incorporar_extras_sdis(
                     obj,
                     ruta_csv_extras=ruta_extras_sdis,
                     col_llave_gdf_preferida="OSSUOpera",
                 )
+                obj["tematica_servicio"] = "Cuidados y apoyos directos"
+
+            # 3) Secretaría de la Mujer
+            elif ("mujer" in entidad_norm) or ("sdmujer" in entidad_norm):
+                obj = filtrar_sdmujer(obj)
+                obj["tematica_servicio"] = "Cuidadoras"
+
+            # 4) Educación
+            elif "educación" in entidad_norm:
+                obj["tematica_servicio"] = "Educación inclusiva"
 
             salida[source_layer] = obj
 
@@ -127,5 +201,6 @@ def aplicar_reglas(
 
 __all__ = [
     "es_capa_sdis",
+    "filtrar_secgeneral",
     "aplicar_reglas",
 ]
