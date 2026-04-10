@@ -158,8 +158,6 @@ def clasificar_tematica(
     return objetivos[0] if objetivos else ""
 
 
-
-
 ## Variables auxiliares para enriquecer capas específicas (SecGeneral y SDIS)
 
 
