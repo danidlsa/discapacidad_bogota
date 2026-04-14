@@ -37,7 +37,7 @@ def descargar_capa_arcgis_a_gdf(
       - GeoDataFrame vacío si la capa está vacía
     """
     s = sesion or requests.Session()
-    s.headers.update({"User-Agent": "undp-data-fetch/1.0"})
+    s.headers.update({"User-Agent": "user-agent-data-fetch/1.0"})
 
     # --- metadata de la capa
     info = s.get(
@@ -203,7 +203,7 @@ def descargar_todas_las_capas(df_fuentes: pd.DataFrame) -> tuple[dict, dict]:
     Devuelve (capas, errores).
     """
     sesion = requests.Session()
-    sesion.headers.update({"User-Agent": "undp-data/1.0"})
+    sesion.headers.update({"User-Agent": "user-agent-data-fetch/1.0"})
 
     capas = {}
     errores = {}
