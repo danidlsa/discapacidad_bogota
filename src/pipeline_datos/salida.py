@@ -25,6 +25,123 @@ try:
 except Exception:
     gpd = None
 
+import re
+import unicodedata
+
+# ---------------------------------------------------------------------
+# Homogeneización de columnas (para que TODAS las salidas usen los mismos nombres)
+# ---------------------------------------------------------------------
+
+_MAPEO_COLUMNAS_ESTANDAR = {
+    "direccion": ["OSSDirecc", "DIRECCION", "puan_direc"],
+    "telefono": ["OSSTelefo", "TELEFONO"],
+    "horario": ["OSSHAtenc", "HORARIO", "puan_horar"],
+    "poblacion_atendida": ["OSSPBenef", "ofer_pobla"],
+    "correo": ["OSSCorreo", "EMAIL"],
+    "descripcion_oferta": ["descripcion_extra", "ofer_descr"],
+    "tipo_discapacidad_str": ["tipo_discapacidad_extra", "DISCAPACID"],
+    # (opcional) si quieres cubrir variantes por tildes/espacios, con la normalización abajo suele bastar
+}
+
+def _norm_colname(s: str) -> str:
+    """Normaliza nombres de columna: lower, sin tildes/diacríticos, sin espacios extremos."""
+    s = str(s).strip().lower()
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+def _primero_no_nulo(df: pd.DataFrame, cols: list[str]) -> pd.Series:
+    """Devuelve una serie con el primer valor no-nulo por fila entre varias columnas."""
+    if len(cols) == 1:
+        return df[cols[0]]
+    # bfill en eje 1: rellena hacia la izquierda con el siguiente no nulo
+    tmp = df[cols].copy()
+    return tmp.bfill(axis=1).iloc[:, 0]
+
+def _parse_edades_a_lista(valor):
+    """Convierte un string tipo '0, 1, 2' o '0 1 2' a lista[int]."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return []
+    if isinstance(valor, list):
+        return valor
+    nums = re.findall(r"\d+", str(valor))
+    return [int(n) for n in nums]
+
+def homogeneizar_columnas_estandar(obj: Any) -> Any:
+    """
+    Homogeneiza nombres de columnas en DF/GDF para salidas consistentes.
+    - Renombra/combina alias -> nombre canónico
+    - Resuelve edades_array / edades_lista si una falta
+    """
+    if not isinstance(obj, pd.DataFrame) and not _es_geodataframe(obj):
+        return obj
+
+    df = obj  # funciona igual para GeoDataFrame (es subclase de DataFrame)
+
+    # índice normalizado de columnas existentes
+    cols_actuales = list(df.columns)
+    norm_to_actual = {}
+    for c in cols_actuales:
+        norm_to_actual[_norm_colname(c)] = c
+
+    # 1) Variables canónicas principales
+    for canon, variantes in _MAPEO_COLUMNAS_ESTANDAR.items():
+        candidatos = []
+        # incluir también si ya existe (aunque con otro case)
+        for nombre in [canon] + variantes:
+            n = _norm_colname(nombre)
+            if n in norm_to_actual:
+                candidatos.append(norm_to_actual[n])
+
+        # quitar duplicados manteniendo orden
+        vistos = set()
+        candidatos = [c for c in candidatos if not (c in vistos or vistos.add(c))]
+
+        if not candidatos:
+            continue
+
+        # crear/actualizar canónica con primero no nulo
+        df[canon] = _primero_no_nulo(df, candidatos)
+
+        # eliminar alias (pero no la canónica)
+        for c in candidatos:
+            if c != canon and c in df.columns:
+                df.drop(columns=[c], inplace=True)
+
+# 2) Edades: dejar SOLO edades_lista (lista[int])
+    posibles_array = ["edades_array", "Array de edades", "array de edades", "array_edades"]
+    posibles_lista = ["edades_lista", "lista_edades", "edades"]
+
+    col_array = None
+    for p in posibles_array:
+        k = _norm_colname(p)
+        if k in norm_to_actual:
+            col_array = norm_to_actual[k]
+            break
+
+    col_lista = None
+    for p in posibles_lista:
+        k = _norm_colname(p)
+        if k in norm_to_actual:
+            col_lista = norm_to_actual[k]
+            break
+
+    # Normalizar nombre si viene distinto
+    if col_lista and col_lista != "edades_lista":
+        df.rename(columns={col_lista: "edades_lista"}, inplace=True)
+
+    # Si no existe edades_lista pero sí edades_array → derivarla
+    if "edades_lista" not in df.columns and col_array:
+        df["edades_lista"] = df[col_array].apply(_parse_edades_a_lista)
+
+    # Eliminar cualquier versión de edades_array
+    if col_array and col_array in df.columns:
+        df.drop(columns=[col_array], inplace=True)
+
+    return obj
+
+
 
 # ---------------------------------------------------------------------
 # Configuración por defecto
@@ -64,13 +181,16 @@ def _sanear_para_json(obj: Any):
 # ---------------------------------------------------------------------
 # Guardar 1 capa
 # ---------------------------------------------------------------------
-
 def guardar_capa(obj: Any, ruta_archivo: str | Path) -> None:
     """
     Guarda un DataFrame/GeoDataFrame según extensión:
     - GeoDataFrame: .gpkg / .geojson / .parquet
     - DataFrame:    .csv / .tsv / .parquet
     """
+
+    # ✅ ESTA ES LA LÍNEA CLAVE QUE FALTABA
+    obj = homogeneizar_columnas_estandar(obj)
+
     ruta_archivo = Path(ruta_archivo)
     ruta_archivo.parent.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +218,6 @@ def guardar_capa(obj: Any, ruta_archivo: str | Path) -> None:
         return
 
     raise TypeError(f"Tipo no soportado para guardar: {type(obj)}")
-
 
 # ---------------------------------------------------------------------
 # Guardar dict de capas
