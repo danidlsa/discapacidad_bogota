@@ -109,7 +109,7 @@ def homogeneizar_columnas_estandar(obj: Any) -> Any:
             if c != canon and c in df.columns:
                 df.drop(columns=[c], inplace=True)
 
-# 2) Edades: dejar SOLO edades_lista (lista[int])
+# 2) Edades: 
     posibles_array = ["edades_array", "Array de edades", "array de edades", "array_edades"]
     posibles_lista = ["edades_lista", "lista_edades", "edades"]
 
@@ -188,7 +188,6 @@ def guardar_capa(obj: Any, ruta_archivo: str | Path) -> None:
     - DataFrame:    .csv / .tsv / .parquet
     """
 
-    # ✅ ESTA ES LA LÍNEA CLAVE QUE FALTABA
     obj = homogeneizar_columnas_estandar(obj)
 
     ruta_archivo = Path(ruta_archivo)
