@@ -39,3 +39,4 @@ __pycache__/
 .vscode/
 .idea/
 src/pipeline_datos/reglas_viejo.py
+salidas/centro-renacer.gpkg
