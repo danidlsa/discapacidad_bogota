@@ -185,13 +185,15 @@ def aplicar_reglas(
 
             # 2) SDIS
             elif es_capa_sdis(entidad):
+                # Marcar SDIS antes del merge para que, si extras falla,
+                # la capa igual entre a la unificación cuidados_sdis.
+                obj["_es_sdis"] = True
                 obj = incorporar_extras_sdis(
                     obj,
                     ruta_csv_extras=ruta_extras_sdis,
                     col_llave_gdf_preferida="OSSUOpera",
                 )
                 obj["tematica_servicio"] = "Cuidados y apoyos directos"
-                obj["_es_sdis"] = True
 
             # 3) Secretaría de la Mujer
             elif ("mujer" in entidad_norm) or ("sdmujer" in entidad_norm):
@@ -200,6 +202,10 @@ def aplicar_reglas(
 
             # 4) Educación
             elif "educación" in entidad_norm:
+                obj = agregar_flags_discapacidad(
+                    obj,
+                    columnas_texto=["DISCAPACID"],
+                )
                 obj["tematica_servicio"] = "Educación inclusiva"
 
             salida[source_layer] = obj

@@ -1,5 +1,5 @@
 {
-  "fecha_ejecucion": "2026-05-07T13:24:47",
+  "fecha_ejecucion": "2026-05-07T18:23:29",
   "rutas": {
     "centro-renacer": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/centro-renacer.gpkg",
     "serviciosmanzanas": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/serviciosmanzanas.gpkg",
@@ -40,7 +40,7 @@
     "educacion": {
       "tiene_geometria": true,
       "filas": 2237,
-      "columnas": 40,
+      "columnas": 46,
       "nombres_columnas": [
         "geometry",
         "OBJECTID",
@@ -77,6 +77,12 @@
         "GRUPOS_ETN",
         "BILINGUE",
         "_es_sdis",
+        "disc_visual",
+        "disc_auditiva",
+        "disc_fisica",
+        "disc_intelectual",
+        "disc_psicosocial",
+        "disc_multiple",
         "tematica_servicio",
         "direccion",
         "telefono",
