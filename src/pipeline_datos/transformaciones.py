@@ -51,15 +51,16 @@ KW_DISCAPACIDAD = {
     "disc_visual": ["visual", "ceguera", "baja vision"],
     "disc_auditiva": ["auditiva", "sordera", "hipoacusia", "lengua de senas", "señas"],
     "disc_fisica": ["fisica", "motora", "movilidad", "paralisis", "amputacion"],
-    "disc_intelectual": ["intelectual", "cognitiva", "aprendizaje"],
-    "disc_psicosocial": ["psicosocial", "salud mental", "mental"],
+    "disc_intelectual": ["intelectual", "cognitiva", "aprendizaje", "tea", "autismo", "autista"],
+    "disc_psicosocial": ["psicosocial", "salud mental", "mental", "tea", "autismo", "autista"],
     "disc_multiple": ["multiple", "múltiple", "sistemica"],
     "disc_voz_habla": ["voz y habla"],
     "disc_otra": ["otra"],
 }
 
-# Keywords que solo cuentan como palabra completa ("otra" no debe matchear "otras")
-KW_PALABRA_COMPLETA = {"otra"}
+# Keywords que solo cuentan como palabra completa ("otra" no debe matchear "otras",
+# "tea" no debe matchear "teatro"). TEA (espectro autista) activa intelectual y psicosocial.
+KW_PALABRA_COMPLETA = {"otra", "tea"}
 
 def agregar_flags_discapacidad(df: pd.DataFrame, columnas_texto: Sequence[str]) -> pd.DataFrame:
     """
@@ -250,58 +251,75 @@ def incorporar_extras_secgeneral(
 def incorporar_extras_sdis(
     gdf,
     ruta_csv_extras: str | Path,
-    col_llave_gdf_preferida: str = "OSSUOpera",
+    col_llave_gdf: str = "ModServ",
 ):
     """
-    Une a capas SDIS variables precalculadas:
+    Une a capas SDIS la ficha del servicio (sdis_extravar.csv, una fila por servicio):
+    - descripcion_extra
+    - secretaria_extra
     - tramo_edad_atendido
-    - edades_array
-    - tipo_discapacidad_extra
-    - edades_lista (opcional)
+    - edades_array / edades_lista
 
-    Estrategia de llave:
-    - Si existe OSSUOpera en el gdf, unimos por OSSUOpera ↔ OSSUOpera (recomendado).  
-    - Si NO existe OSSUOpera, intentamos OSSServic ↔ Modelo de operación (fallback). 
+    Se une por ModServ (nombre del servicio que trae cada registro), no por el
+    nombre de la sede, que SDIS cambia con frecuencia. El tipo de discapacidad
+    no viene del CSV: se calcula desde OSSPBenef con agregar_flags_discapacidad.
     """
+    if col_llave_gdf not in gdf.columns:
+        raise KeyError(f"No encuentro la columna '{col_llave_gdf}' para unir SDIS.")
+
     extras = pd.read_csv(ruta_csv_extras, sep=";")
 
-    # elegimos llave del gdf
-    if col_llave_gdf_preferida in gdf.columns:
-        col_gdf = col_llave_gdf_preferida
-        col_extras = "OSSUOpera"
-    elif "OSSServic" in gdf.columns:
-        col_gdf = "OSSServic"
-        col_extras = "Modelo de operación"
-    else:
-        raise KeyError("No encuentro columna para unir SDIS. Esperaba 'OSSUOpera' o 'OSSServic' en el gdf.")
-
-    extras["_clave"] = extras[col_extras].map(normalizar_texto)
-    gdf["_clave"] = gdf[col_gdf].map(normalizar_texto)
+    extras["_clave"] = extras["ModServ"].map(normalizar_texto)
+    gdf["_clave"] = gdf[col_llave_gdf].map(normalizar_texto)
 
     extras = extras.rename(columns={
         "Tramo de edad atendido": "tramo_edad_atendido",
         "Array de edades": "edades_array",
-        "Tipo de discapacidad": "tipo_discapacidad_extra",
         "Secretaría": "secretaria_extra",
-        "Descripcion": "descripcion_extra",  
+        "Descripcion": "descripcion_extra",
     })
 
     cols_keep = [
         "_clave",
         "secretaria_extra",
-        "descripcion_extra",       
-        "tipo_discapacidad_extra",
+        "descripcion_extra",
         "tramo_edad_atendido",
         "edades_array",
     ]
 
-# si hay duplicados por _clave, nos quedamos con el primero
     extras = extras[cols_keep].drop_duplicates("_clave")
-    
+
+    sin_ficha = set(gdf["_clave"]) - set(extras["_clave"])
+    if sin_ficha:
+        print(f"AVISO: servicios SDIS sin fila en {Path(ruta_csv_extras).name}: {sorted(sin_ficha)}")
+
     out = gdf.merge(extras, on="_clave", how="left")
     out["edades_lista"] = out["edades_array"].apply(parsear_edades)
 
     return out.drop(columns=["_clave"])
+
+
+ETIQUETAS_DISCAPACIDAD = {
+    "disc_visual": "Visual",
+    "disc_auditiva": "Auditiva",
+    "disc_fisica": "Física",
+    "disc_intelectual": "Intelectual",
+    "disc_psicosocial": "Psicosocial",
+    "disc_multiple": "Múltiple",
+    "disc_voz_habla": "Voz y habla",
+    "disc_otra": "Otra",
+}
+
+
+def tipo_discapacidad_desde_flags(df: pd.DataFrame) -> pd.Series:
+    """Texto legible ('Intelectual, Múltiple') a partir de las flags disc_*."""
+    cols = [c for c in ETIQUETAS_DISCAPACIDAD if c in df.columns]
+
+    def _fila(r):
+        tipos = [ETIQUETAS_DISCAPACIDAD[c] for c in cols if r[c] == 1]
+        return ", ".join(tipos) if tipos else "Sin especificar"
+
+    return df.apply(_fila, axis=1)
 
 
 __all__ = [
@@ -310,6 +328,7 @@ __all__ = [
 
     # enrich / classify
     "agregar_flags_discapacidad",
+    "tipo_discapacidad_desde_flags",
     "clasificar_tematica",
 
     # extras precalculados

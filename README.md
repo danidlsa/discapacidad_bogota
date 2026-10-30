@@ -63,7 +63,6 @@ Las capas se definen en la tabla `sourcelayers.csv`. Se incluyen:
 
 ### Secretaría Distrital de Integración Social (SDIS)
 - Centro de Atención Distrital para la Inclusión Social (CADIS)
-- Centros Renacer
 - Centros Crecer
 - Centros Integrarte (atención interna y externa)
 
@@ -104,13 +103,14 @@ Las reglas se implementan en `reglas.py` y determinan qué transformaciones reci
 Las capas de Educación y Mujer no reciben tratamiento extra.
 
 ### Capas SDIS
-- Unión con `sdis_extravar.csv`
+- Unión con `sdis_extravar.csv` (una fila por servicio) por el campo `ModServ`, no por el nombre de la sede
 - Incorporación de:
   - tramo de edad
   - array de edades
-  - tipo de discapacidad
   - descripción del servicio
-- Relleno de descripciones faltantes cuando corresponde
+- Tipo de discapacidad calculado desde el dato (`OSSPBenef`, población beneficiaria): flags `disc_*` y `tipo_discapacidad_str`
+- Aviso si llega un servicio sin fila en el CSV
+- La capa `centro-renacer` se retiró en octubre de 2026: el endpoint pasó a publicar comunidades de cuidado para habitantes de calle adultos
 
 ### Capa Secretaría General
 - Filtrado de registros:

@@ -52,7 +52,7 @@ COL_URL_SERVICIO_FEATURE = "URL Servicio Feature"
 # Columnas esperadas (extras SDIS)
 # ---------------------------------------------------------------------
 
-COL_SDIS_LLAVE_PRIMARIA = "OSSUOpera"            
+COL_SDIS_LLAVE_PRIMARIA = "ModServ"            
 COL_SDIS_DESCRIPCION = "Descripcion"             
 COL_SDIS_TIPO_DISCAPACIDAD = "Tipo de discapacidad"  
 COL_SDIS_TRAMO_EDAD = "Tramo de edad atendido"   

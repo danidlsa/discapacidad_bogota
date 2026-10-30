@@ -22,6 +22,7 @@ from .transformaciones import (
     incorporar_extras_secgeneral,
     clasificar_tematica,
     agregar_flags_discapacidad,
+    tipo_discapacidad_desde_flags,
     normalizar_texto,
 )
 
@@ -224,8 +225,13 @@ def aplicar_reglas(
                 obj = incorporar_extras_sdis(
                     obj,
                     ruta_csv_extras=ruta_extras_sdis,
-                    col_llave_gdf_preferida="OSSUOpera",
                 )
+                # tipo de discapacidad: del dato (población beneficiaria), no del CSV
+                obj = agregar_flags_discapacidad(
+                    obj,
+                    columnas_texto=["OSSPBenef"],
+                )
+                obj["tipo_discapacidad_str"] = tipo_discapacidad_desde_flags(obj)
                 obj["tematica_servicio"] = "Cuidados y apoyos directos"
 
             # 3) Secretaría de la Mujer
