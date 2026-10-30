@@ -199,9 +199,11 @@ def aplicar_reglas(
                     col_llave_gdf="ofer_nombr",
                     col_llave_extras="ofer_nombr",
                 )
+                # solo la descripción: el nombre del sector no indica tipo de
+                # discapacidad ("Movilidad" activaba disc_fisica)
                 obj = agregar_flags_discapacidad(
                     obj,
-                    columnas_texto=["ofer_descr", "sect_nombr"],
+                    columnas_texto=["ofer_descr"],
                 )
 
                 if "ofer_descr" in obj.columns and "sect_nombr" in obj.columns:
