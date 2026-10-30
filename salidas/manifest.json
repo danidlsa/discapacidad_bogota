@@ -1,5 +1,5 @@
 {
-  "fecha_ejecucion": "2026-10-30T11:29:31",
+  "fecha_ejecucion": "2026-10-30T14:22:03",
   "rutas": {
     "serviciosmanzanas": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/serviciosmanzanas.gpkg",
     "educacion": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/educacion.gpkg",
@@ -120,8 +120,8 @@
     },
     "cuidados_sdis": {
       "tiene_geometria": true,
-      "filas": 43,
-      "columnas": 32,
+      "filas": 40,
+      "columnas": 40,
       "nombres_columnas": [
         "CODIGO_UPL",
         "CodCaract",
@@ -142,19 +142,27 @@
         "SCaNombre",
         "UPlCodigo",
         "UPlNombre",
+        "disc_auditiva",
+        "disc_fisica",
+        "disc_intelectual",
+        "disc_multiple",
+        "disc_otra",
+        "disc_psicosocial",
+        "disc_visual",
+        "disc_voz_habla",
         "edades_lista",
         "geometry",
         "origen_sdis",
         "secretaria_extra",
         "tematica_servicio",
+        "tipo_discapacidad_str",
         "tramo_edad_atendido",
         "direccion",
         "telefono",
         "horario",
         "poblacion_atendida",
         "correo",
-        "descripcion_oferta",
-        "tipo_discapacidad_str"
+        "descripcion_oferta"
       ]
     }
   }
