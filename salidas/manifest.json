@@ -1,7 +1,6 @@
 {
-  "fecha_ejecucion": "2026-05-07T18:23:29",
+  "fecha_ejecucion": "2026-10-30T11:29:31",
   "rutas": {
-    "centro-renacer": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/centro-renacer.gpkg",
     "serviciosmanzanas": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/serviciosmanzanas.gpkg",
     "educacion": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/educacion.gpkg",
     "oferta_discapacidad_secgeneral": "/Users/danieladelossantos/Library/CloudStorage/OneDrive-UnitedNationsDevelopmentProgramme/Georreferenciación/Proyecto discapacidad/Colombia/Inventario de datos/DICCIONARIO IDECA/repo/discapacidad_bogota/salidas/oferta_discapacidad_secgeneral.gpkg",
@@ -9,18 +8,9 @@
   },
   "notas": {},
   "capas": {
-    "centro-renacer": {
-      "tiene_geometria": true,
-      "filas": 0,
-      "columnas": 2,
-      "nombres_columnas": [
-        "geometry",
-        "_es_sdis"
-      ]
-    },
     "serviciosmanzanas": {
       "tiene_geometria": true,
-      "filas": 151,
+      "filas": 86,
       "columnas": 12,
       "nombres_columnas": [
         "geometry",
@@ -39,17 +29,15 @@
     },
     "educacion": {
       "tiene_geometria": true,
-      "filas": 2237,
-      "columnas": 46,
+      "filas": 1519,
+      "columnas": 42,
       "nombres_columnas": [
         "geometry",
         "OBJECTID",
         "NOMBRE_EST",
         "DANE12_EST",
-        "NIT",
         "NOMBRE_SED",
         "DANE12_SED",
-        "CPF",
         "FECHA",
         "BARRIO__GE",
         "WEB",
@@ -64,12 +52,8 @@
         "ESTRATO",
         "ZONA",
         "COD_LOCA",
+        "NOM_UPZ",
         "NOM_UPL",
-        "COD_UPL",
-        "COD_UPZ",
-        "NOMBRE_UPZ",
-        "CODIGO_POS",
-        "SECTOR_CEN",
         "ESPECIALID",
         "CARACTER_P",
         "ENFASIS_PA",
@@ -83,6 +67,8 @@
         "disc_intelectual",
         "disc_psicosocial",
         "disc_multiple",
+        "disc_voz_habla",
+        "disc_otra",
         "tematica_servicio",
         "direccion",
         "telefono",
@@ -93,7 +79,7 @@
     "oferta_discapacidad_secgeneral": {
       "tiene_geometria": true,
       "filas": 263,
-      "columnas": 33,
+      "columnas": 35,
       "nombres_columnas": [
         "geometry",
         "OBJECTID",
@@ -123,6 +109,8 @@
         "disc_intelectual",
         "disc_psicosocial",
         "disc_multiple",
+        "disc_voz_habla",
+        "disc_otra",
         "tematica_servicio",
         "direccion",
         "horario",
@@ -132,7 +120,7 @@
     },
     "cuidados_sdis": {
       "tiene_geometria": true,
-      "filas": 41,
+      "filas": 43,
       "columnas": 32,
       "nombres_columnas": [
         "CODIGO_UPL",

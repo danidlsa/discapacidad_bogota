@@ -53,8 +53,13 @@ KW_DISCAPACIDAD = {
     "disc_fisica": ["fisica", "motora", "movilidad", "paralisis", "amputacion"],
     "disc_intelectual": ["intelectual", "cognitiva", "aprendizaje"],
     "disc_psicosocial": ["psicosocial", "salud mental", "mental"],
-    "disc_multiple": ["multiple", "múltiple"],
+    "disc_multiple": ["multiple", "múltiple", "sistemica"],
+    "disc_voz_habla": ["voz y habla"],
+    "disc_otra": ["otra"],
 }
+
+# Keywords que solo cuentan como palabra completa ("otra" no debe matchear "otras")
+KW_PALABRA_COMPLETA = {"otra"}
 
 def agregar_flags_discapacidad(df: pd.DataFrame, columnas_texto: Sequence[str]) -> pd.DataFrame:
     """
@@ -69,7 +74,11 @@ def agregar_flags_discapacidad(df: pd.DataFrame, columnas_texto: Sequence[str]) 
     texto = df[cols].astype(str).agg(" ".join, axis=1).map(normalizar_texto)
 
     for nombre_flag, lista_kw in KW_DISCAPACIDAD.items():
-        patrones = [re.escape(normalizar_texto(k)) for k in lista_kw]
+        patrones = [
+            rf"\b{re.escape(normalizar_texto(k))}\b" if k in KW_PALABRA_COMPLETA
+            else re.escape(normalizar_texto(k))
+            for k in lista_kw
+        ]
         if patrones:
             patron = re.compile("|".join(patrones))
             df[nombre_flag] = texto.map(lambda t: 1 if patron.search(t) else 0)

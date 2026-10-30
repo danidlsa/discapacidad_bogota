@@ -189,6 +189,8 @@ def guardar_capa(obj: Any, ruta_archivo: str | Path) -> None:
     """
 
     obj = homogeneizar_columnas_estandar(obj)
+    if isinstance(obj, pd.DataFrame):
+        obj = obj.drop(columns=["_es_sdis"], errors="ignore")
 
     ruta_archivo = Path(ruta_archivo)
     ruta_archivo.parent.mkdir(parents=True, exist_ok=True)

@@ -22,6 +22,7 @@ from .transformaciones import (
     incorporar_extras_secgeneral,
     clasificar_tematica,
     agregar_flags_discapacidad,
+    normalizar_texto,
 )
 
 # ---------------------------------------------------------------------
@@ -64,12 +65,44 @@ def filtrar_sdmujer(obj):
     if "TIPO_SERVI" not in obj.columns:
         return obj
 
+    # El servicio puede devolver el código del dominio Mujer_TipoServicio
+    # o su descripción (y la redacción de la descripción ha cambiado), así que
+    # se aceptan ambos, comparando el texto normalizado.
+    #   1 = Para las Cuidadoras
+    #   2 = Para quienes requieren cuidado (excluido)
+    #   3 = Para las Familias de las cuidadoras y comunidad
+    # El código 2 se excluye a propósito: es oferta general de cuidado (jardines,
+    # personas mayores, salud) y lo que tiene de discapacidad (Centros Crecer)
+    # ya entra por cuidados_sdis. Desde la recarga de la capa (2026) los
+    # servicios "para familias" quedaron en el código 2 y el 3 está vacío.
     valores_validos = {
-        "Para las Cuidadoras",
-        "Para familias de las cuidadoras y Comunidad",
+        normalizar_texto(v)
+        for v in [
+            "1",
+            "3",
+            "Para las Cuidadoras",
+            "Para las Familias de las cuidadoras y comunidad",
+            "Para familias de las cuidadoras y Comunidad",
+        ]
     }
 
-    return obj[obj["TIPO_SERVI"].isin(valores_validos)]
+    valor = obj["TIPO_SERVI"].map(normalizar_texto).str.removesuffix(".0")
+
+    return obj[valor.isin(valores_validos)]
+
+
+def filtrar_educacion(obj):
+    """
+    Deja solo colegios que atienden algún tipo de discapacidad:
+    DISCAPACID no nulo, no vacío y distinto de 'NINGUNA'.
+    """
+    if "DISCAPACID" not in obj.columns:
+        return obj
+
+    valor = obj["DISCAPACID"].astype("string").str.strip()
+    mascara = valor.notna() & (valor != "") & (valor.str.upper() != "NINGUNA")
+
+    return obj[mascara]
 
 
 # ---------------------------------------------------------------------
@@ -202,6 +235,7 @@ def aplicar_reglas(
 
             # 4) Educación
             elif "educación" in entidad_norm:
+                obj = filtrar_educacion(obj)
                 obj = agregar_flags_discapacidad(
                     obj,
                     columnas_texto=["DISCAPACID"],
@@ -223,6 +257,7 @@ def aplicar_reglas(
 __all__ = [
     "es_capa_sdis",
     "filtrar_secgeneral",
+    "filtrar_educacion",
     "unir_capas_sdis",
     "aplicar_reglas",
 ]

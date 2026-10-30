@@ -38,6 +38,10 @@ from pipeline_datos.configuracion import (
     ARCHIVO_FUENTES,
 )
 
+from pipeline_datos.fechas import (
+    actualizar_fechas_fuentes,
+)
+
 from pipeline_datos.ingesta import (
     cargar_fuentes_desde_csv,
     descargar_todas_las_capas,
@@ -73,10 +77,23 @@ def main() -> None:
     print("== Pipeline Discapacidad Bogotá ==")
 
     # --------------------------------------------------
-    # 1. Leer fuentes
+    # 0. Actualizar fechas de las fuentes
     # --------------------------------------------------
 
     ruta_fuentes = ruta_apoyo(ARCHIVO_FUENTES)
+
+    print("\nActualizando fechas de actualización de las fuentes...")
+
+    try:
+        resumen_fechas = actualizar_fechas_fuentes(ruta_fuentes)
+        print(resumen_fechas.to_string(index=False))
+    except Exception as e:
+        # No detener el pipeline si fallan las consultas de fechas
+        print(f"AVISO: no se pudieron actualizar las fechas -> {e}")
+
+    # --------------------------------------------------
+    # 1. Leer fuentes
+    # --------------------------------------------------
 
     print(f"\nLeyendo fuentes desde: {ruta_fuentes}")
 
