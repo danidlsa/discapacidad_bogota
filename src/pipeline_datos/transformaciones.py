@@ -227,7 +227,6 @@ def incorporar_extras_secgeneral(
     extras_agg = (
         extras.groupby("_clave", as_index=False)
         .agg({
-            "Secretaría": primero_no_vacio,
             "Tramo de edad atendido": primero_no_vacio,
             "Array de edades": primero_no_vacio,
         })
@@ -237,7 +236,6 @@ def incorporar_extras_secgeneral(
     extras_agg = extras_agg.rename(columns={
         "Tramo de edad atendido": "tramo_edad_atendido",
         "Array de edades": "edades_array",
-        "Secretaría": "secretaria_extra",
     })
 
     out = gdf.merge(extras_agg, on="_clave", how="left")
