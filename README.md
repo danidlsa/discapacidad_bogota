@@ -16,18 +16,21 @@ El objetivo del pipeline es:
 discapacidad_bogota/
 ├── src/
 │   └── pipeline_datos/
-│       ├── ingesta.py
-│       ├── transformaciones.py
-│       ├── reglas.py
-│       ├── salida.py
-│       └── configuracion.py
+│       ├── configuracion.py      # rutas y constantes
+│       ├── fechas.py             # actualiza las fechas de sourcelayers.csv
+│       ├── ingesta.py            # descarga desde ArcGIS REST
+│       ├── reglas.py             # reglas por capa / entidad
+│       ├── transformaciones.py   # normalización, indicadores, uniones con tablas de apoyo
+│       ├── salida.py             # homogeneización de columnas y escritura
+│       └── apoyo/
+│           ├── sourcelayers.csv
+│           ├── sdis_extravar.csv
+│           └── secgeneral_extravar.csv
 ├── scripts/
-│   └── ejecutar_pipeline.py
-├── apoyo/
-│   ├── sourcelayers.csv
-│   ├── sdis_extravar.csv
-│   └── secgeneral_extravar.csv
+│   ├── ejecutar_pipeline.py
+│   └── actualizar_fechas.py
 ├── salidas/
+├── requirements.txt
 └── README.md
 ```
 
@@ -35,64 +38,67 @@ discapacidad_bogota/
 
 ## Flujo general del pipeline
 
-El pipeline sigue cuatro etapas principales:
+`scripts/ejecutar_pipeline.py` corre cinco etapas:
 
-1. **Ingesta**
+0. **Fechas de actualización**
+   - Actualiza la columna `Fecha de actualización` de `sourcelayers.csv` con la fecha que publica cada fuente: la última edición de datos del servicio ArcGIS (`editingInfo`) o, si el servicio no la publica, la fecha de la ficha en Datos Abiertos Bogotá.
+   - Si una consulta falla, se deja la fecha anterior y el pipeline sigue.
+
+1. **Lectura de fuentes**
    - Lectura de la tabla de fuentes (`sourcelayers.csv`)
-   - Descarga de capas desde servicios ArcGIS REST
-   - Manejo tanto de capas espaciales como de tablas no espaciales
 
-2. **Reglas**
-   - Identificación de la entidad responsable de cada capa
-   - Aplicación de reglas diferenciadas según el tipo de capa
+2. **Ingesta**
+   - Descarga completa de cada capa desde su servicio ArcGIS REST, paginando según `maxRecordCount`, en EPSG:4326
+   - Se descartan los registros sin geometría
 
-3. **Transformaciones**
-   - Limpieza y normalización de texto
-   - Generación de nuevas variables
-   - Cruce con tablas auxiliares precalculadas
+3. **Reglas y transformaciones**
+   - Filtros, uniones con tablas de apoyo y variables nuevas según la capa (ver abajo)
 
 4. **Salidas**
-   - Exportación de capas procesadas
-   - Generación de metadatos de ejecución
+   - Homogeneización de nombres de columnas y exportación de las capas procesadas
+   - Generación de metadatos de ejecución (`manifest.json`)
 
 ---
 
 ## Capas utilizadas
 
-Las capas se definen en la tabla `sourcelayers.csv`. Se incluyen:
+Las capas se definen en la tabla `src/pipeline_datos/apoyo/sourcelayers.csv`. Se incluyen:
 
 ### Secretaría Distrital de Integración Social (SDIS)
 - Centro de Atención Distrital para la Inclusión Social (CADIS)
 - Centros Crecer
 - Centros Integrarte (atención interna y externa)
 
-## Secretaría de Educación
-- Matrícula Total en Colegios Oficiales. Bogotá D.C.
-
-## Secretaría de la Mujer
-- Servicios prestados en las Manzanas del Cuidado
+### Secretaría de Educación (SED)
+- Colegios. Bogotá D.C. (oficiales y no oficiales)
 
 ### Secretaría General
 - Oferta de Discapacidad Bogotá (capa intersectorial consolidada)
 
+### Secretaría de la Mujer (SDMujer)
+- Servicios prestados en las Manzanas del Cuidado
+
 ---
 
-## Transformaciones aplicadas
+## Transformaciones comunes
 
-Las transformaciones se implementan en `transformaciones.py` e incluyen:
+Se implementan en `transformaciones.py` y `salida.py`:
 
-- **Normalización de texto**
-  - Conversión a minúsculas
-  - Eliminación de tildes y caracteres especiales
+- **Normalización de texto** para comparar nombres y buscar palabras: minúsculas, sin tildes, espacios colapsados.
 
-- **Identificación de discapacidad**
-  - Creación de variables binarias a partir de palabras clave
+- **Indicadores de tipo de discapacidad** (SDIS, Colegios y Secretaría General): ocho variables binarias (`disc_visual`, `disc_auditiva`, `disc_fisica`, `disc_intelectual`, `disc_psicosocial`, `disc_multiple`, `disc_voz_habla`, `disc_otra`) a partir de palabras clave (`KW_DISCAPACIDAD`) buscadas en un campo de texto de cada fuente:
 
-- **Incorporación de variables precalculadas**
-  - Tramo de edad atendido
-  - Array de edades
-  - Tipo de discapacidad (solo para capas SDIS)
-  - Descripción ampliada de servicios SDIS
+  | Capa | Campo de texto |
+  |---|---|
+  | SDIS | `OSSPBenef` (población beneficiaria) |
+  | Colegios | `DISCAPACID` |
+  | Secretaría General | `ofer_descr` |
+
+  «sistémica» cuenta como múltiple; «TEA» y «autismo» activan intelectual y psicosocial; «otra» y «tea» solo cuentan como palabra completa.
+
+- **Temática del servicio** (`tematica_servicio`) en todas las capas.
+
+- **Nombres comunes de columnas** en las salidas (`direccion`, `telefono`, `horario`, `correo`, `poblacion_atendida`, `descripcion_oferta`, `tipo_discapacidad_str`), sin importar cómo se llamen en cada fuente.
 
 ---
 
@@ -100,25 +106,35 @@ Las transformaciones se implementan en `transformaciones.py` e incluyen:
 
 Las reglas se implementan en `reglas.py` y determinan qué transformaciones recibe cada capa.
 
-Las capas de Educación y Mujer no reciben tratamiento extra.
-
 ### Capas SDIS
+- Las cuatro capas se unen en una sola, `cuidados_sdis`; `origen_sdis` indica la capa de origen
 - Unión con `sdis_extravar.csv` (una fila por servicio) por el campo `ModServ`, no por el nombre de la sede
 - Incorporación de:
   - tramo de edad
   - array de edades
   - descripción del servicio
-- Tipo de discapacidad calculado desde el dato (`OSSPBenef`, población beneficiaria): flags `disc_*` y `tipo_discapacidad_str`
+- Tipo de discapacidad calculado desde el dato (`OSSPBenef`): indicadores `disc_*` y `tipo_discapacidad_str` (p. ej. «Intelectual, Múltiple»; «Sin especificar» si no menciona ninguno)
 - Aviso si llega un servicio sin fila en el CSV
+- `tematica_servicio`: «Cuidados y apoyos directos»
 - La capa `centro-renacer` se retiró en octubre de 2026: el endpoint pasó a publicar comunidades de cuidado para habitantes de calle adultos
+
+### Capa Educación (Colegios)
+- Filtrado: solo colegios que reportan algún tipo de discapacidad atendida (`DISCAPACID` no vacío y distinto de «NINGUNA»)
+- Indicadores `disc_*` desde `DISCAPACID`; `DISCAPACID` se publica como `tipo_discapacidad_str`
+- `tematica_servicio`: «Educación inclusiva»
 
 ### Capa Secretaría General
 - Filtrado de registros:
   - eliminación de geometrías nulas o vacías
-  - exclusión de ofertas pertenecientes a entidades que ya se procesan como capas propias
-- Unión con `secgeneral_extravar.csv`
-- Incorporación de variables de edad
-- Incorporación de tipo de discapacidad
+  - exclusión de los sectores que ya se procesan como capas propias (Educación, Mujer, Integración Social, Inclusión Social y Reconciliación)
+- Unión con `secgeneral_extravar.csv` (una fila por nombre de oferta) por `ofer_nombr`: tramo de edad y array de edades
+- Indicadores `disc_*` desde la descripción de la oferta (`ofer_descr`)
+- `tematica_servicio`: el nombre del sector; la oferta de Gobierno se clasifica por palabras clave de su descripción (`KW_TEMATICA`)
+
+### Capa Secretaría de la Mujer (Manzanas del Cuidado)
+- Filtrado por tipo de servicio (`TIPO_SERVI`): se conservan los códigos 1 (Para las Cuidadoras) y 3 (Para las Familias de las cuidadoras y comunidad). Se acepta el código o su descripción.
+- Se excluye el código 2 (Para quienes requieren cuidado): es oferta general de cuidado, y lo que tiene de discapacidad (Centros Crecer) ya entra por SDIS
+- `tematica_servicio`: «Cuidadoras»
 
 ---
 
@@ -126,12 +142,14 @@ Las capas de Educación y Mujer no reciben tratamiento extra.
 
 Los resultados se guardan en la carpeta `salidas/`:
 
-- Capas espaciales: formato GeoPackage (`.gpkg`)
-- Tablas no espaciales: formato CSV (`.csv`)
+- Capas espaciales: formato GeoPackage (`.gpkg`), una por tema: `cuidados_sdis`, `educacion`, `oferta_discapacidad_secgeneral`, `serviciosmanzanas`
+- Tablas no espaciales (si las hubiera): formato CSV (`.csv`)
 - Archivo `manifest.json` con información de ejecución:
   - fecha de la corrida
   - capas generadas
-  - número de filas y columnas
+  - número de filas y columnas, y nombres de columnas
+
+Las capas `.gpkg` se versionan en el repositorio; `manifest.json` se genera en cada corrida pero no se versiona (está en `.gitignore`).
 
 ---
 
@@ -140,7 +158,15 @@ Los resultados se guardan en la carpeta `salidas/`:
 Desde la raíz del repositorio:
 
 ```bash
+pip install -r requirements.txt
 python scripts/ejecutar_pipeline.py
+```
+
+Para actualizar solo las fechas de `sourcelayers.csv`, sin correr el pipeline:
+
+```bash
+python scripts/actualizar_fechas.py            # actualiza el CSV
+python scripts/actualizar_fechas.py --dry-run  # solo muestra los cambios
 ```
 
 ### Requisitos
