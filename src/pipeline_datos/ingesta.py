@@ -15,6 +15,8 @@ import requests
 import pandas as pd
 import geopandas as gpd
 
+from .configuracion import COL_ORIGEN_DESCARGA, COL_URL_DATOS_ABIERTOS
+
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -155,12 +157,99 @@ def descargar_capa_arcgis_a_gdf(
     return gdf
 
 
+API_CKAN = "https://datosabiertos.bogota.gov.co/api/3/action/package_show"
+
+
+def recurso_mas_reciente(
+    url_dataset: str,
+    sesion: requests.Session,
+    formatos: tuple[str, ...] = ("gpkg", "geojson"),
+    timeout: int = 60,
+):
+    """
+    Busca en Datos Abiertos Bogotá (CKAN) el archivo descargable más reciente
+    del dataset, entre los formatos indicados (en ese orden de preferencia si
+    empatan en fecha). Devuelve el dict del recurso o None.
+    """
+    match = re.search(r"/dataset/([^/?#\s]+)", str(url_dataset))
+    if not match:
+        return None
+
+    r = sesion.get(API_CKAN, params={"id": match.group(1)}, timeout=timeout)
+    r.raise_for_status()
+    recursos = (r.json().get("result") or {}).get("resources", [])
+
+    candidatos = [
+        x for x in recursos
+        if str(x.get("format", "")).strip().lower() in formatos and x.get("url")
+    ]
+    if not candidatos:
+        return None
+
+    def _orden(x):
+        fecha = x.get("last_modified") or x.get("created") or ""
+        pref = -formatos.index(str(x.get("format")).strip().lower())
+        return (fecha[:10], pref)
+
+    return max(candidatos, key=_orden)
+
+
+def descargar_archivo_datos_abiertos(
+    url_dataset: str,
+    sesion: requests.Session | None = None,
+    sr_salida: int = 4326,
+    timeout: int = 180,
+):
+    """
+    Descarga el archivo más reciente (GPKG o GeoJSON) de un dataset de Datos
+    Abiertos Bogotá y lo devuelve como GeoDataFrame en sr_salida.
+
+    Se usa para capas cuyo servicio REST está desactualizado respecto del
+    archivo publicado (p. ej. Colegios: el MapServer de Catastro seguía en la
+    versión 12.25 cuando el portal ya tenía la 09.26).
+    """
+    import tempfile
+    from pathlib import Path
+
+    s = sesion or requests.Session()
+    recurso = recurso_mas_reciente(url_dataset, s)
+    if recurso is None:
+        raise RuntimeError(f"No encontré archivos GPKG/GeoJSON en {url_dataset}")
+
+    r = s.get(recurso["url"], timeout=timeout)
+    r.raise_for_status()
+
+    sufijo = "." + str(recurso.get("format")).strip().lower()
+    with tempfile.TemporaryDirectory() as carpeta:
+        ruta = Path(carpeta) / f"recurso{sufijo}"
+        ruta.write_bytes(r.content)
+        gdf = gpd.read_file(ruta)
+
+    sin_geom = gdf.geometry.isna() | gdf.geometry.is_empty
+    gdf = gdf[~sin_geom].copy()
+    if gdf.crs is not None:
+        gdf = gdf.to_crs(epsg=sr_salida)
+
+    gdf.attrs["descartados_sin_geometria"] = int(sin_geom.sum())
+    gdf.attrs["recurso"] = recurso.get("name")
+    gdf.attrs["recurso_fecha"] = (recurso.get("last_modified") or recurso.get("created") or "")[:10]
+    return gdf
+
+
+
 def extraer_primera_url(valor):
     """Extrae la primera URL http(s) encontrada en un texto."""
     if pd.isna(valor):
         return None
     match = re.search(r"https?://[^\s]+", str(valor))
     return match.group(0) if match else None
+
+
+def es_origen_datos_abiertos(valor) -> bool:
+    """True si la columna de origen indica descargar el archivo de Datos Abiertos."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return False
+    return "datos abiertos" in str(valor).strip().lower()
 
 
 
@@ -200,6 +289,8 @@ def descargar_todas_las_capas(df_fuentes: pd.DataFrame) -> tuple[dict, dict]:
     Espera que existan:
       - source_layer
       - url_servicio_feature_clean
+    y, opcionalmente, COL_ORIGEN_DESCARGA: "datos abiertos" descarga el archivo
+    más reciente del dataset (COL_URL_DATOS_ABIERTOS) en vez del servicio REST.
     Devuelve (capas, errores).
     """
     sesion = requests.Session()
@@ -211,12 +302,19 @@ def descargar_todas_las_capas(df_fuentes: pd.DataFrame) -> tuple[dict, dict]:
     for _, row in df_fuentes.iterrows():
         key = row["source_layer"]
         url = row["url_servicio_feature_clean"]
+        desde_archivo = es_origen_datos_abiertos(row.get(COL_ORIGEN_DESCARGA))
+        if desde_archivo:
+            url = row.get(COL_URL_DATOS_ABIERTOS)
 
-        if not url:
+        if not url or pd.isna(url):
             continue
 
         try:
-            obj = descargar_capa_arcgis_a_gdf(url, sr_salida=4326, sesion=sesion)
+            if desde_archivo:
+                obj = descargar_archivo_datos_abiertos(url, sesion=sesion)
+                print(f"   ({key}: archivo de Datos Abiertos '{obj.attrs.get('recurso')}', {obj.attrs.get('recurso_fecha')})")
+            else:
+                obj = descargar_capa_arcgis_a_gdf(url, sr_salida=4326, sesion=sesion)
 
             capas[key] = obj
 

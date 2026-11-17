@@ -46,6 +46,8 @@ ARCHIVO_EXTRAS_SECGENERAL = "secgeneral_extravar.csv"
 COL_SOURCE_LAYER = "source_layer"            
 COL_ENTIDAD = "Entidad"                     
 COL_URL_SERVICIO_FEATURE = "URL Servicio Feature"    
+COL_URL_DATOS_ABIERTOS = "URL Datos Abiertos de Bogotá"
+COL_ORIGEN_DESCARGA = "Origen de descarga"   # "servicio" (por defecto) o "datos abiertos"
 
 
 # ---------------------------------------------------------------------
@@ -99,6 +101,8 @@ __all__ = [
     "COL_SOURCE_LAYER",
     "COL_ENTIDAD",
     "COL_URL_SERVICIO_FEATURE",
+    "COL_URL_DATOS_ABIERTOS",
+    "COL_ORIGEN_DESCARGA",
     "COL_SDIS_LLAVE_PRIMARIA",
     "COL_SDIS_DESCRIPCION",
     "COL_SDIS_TIPO_DISCAPACIDAD",

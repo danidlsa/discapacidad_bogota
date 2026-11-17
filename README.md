@@ -41,7 +41,7 @@ discapacidad_bogota/
 `scripts/ejecutar_pipeline.py` corre cinco etapas:
 
 0. **Fechas de actualización**
-   - Actualiza la columna `Fecha de actualización` de `sourcelayers.csv` con la fecha que publica cada fuente: la última edición de datos del servicio ArcGIS (`editingInfo`) o, si el servicio no la publica, la fecha de la ficha en Datos Abiertos Bogotá.
+   - Actualiza la columna `Fecha de actualización` de `sourcelayers.csv` con la fecha que publica cada fuente: para las capas que se bajan de un archivo, la fecha de ese archivo; para las demás, la última edición de datos del servicio ArcGIS (`editingInfo`) o, si el servicio no la publica, la fecha de la ficha en Datos Abiertos Bogotá (que no siempre coincide con la de los datos).
    - Si una consulta falla, se deja la fecha anterior y el pipeline sigue.
 
 1. **Lectura de fuentes**
@@ -49,6 +49,7 @@ discapacidad_bogota/
 
 2. **Ingesta**
    - Descarga completa de cada capa desde su servicio ArcGIS REST, paginando según `maxRecordCount`, en EPSG:4326
+   - Excepción: las capas con `Origen de descarga` = `datos abiertos` en `sourcelayers.csv` se descargan del archivo (GPKG o GeoJSON) más reciente de su dataset en Datos Abiertos Bogotá, porque su servicio REST está desactualizado. Hoy es el caso de Colegios: en noviembre de 2026 el MapServer de Catastro seguía en la versión 12.25 y el portal ya tenía la 09.26.
    - Se descartan los registros sin geometría
 
 3. **Reglas y transformaciones**
@@ -70,7 +71,7 @@ Las capas se definen en la tabla `src/pipeline_datos/apoyo/sourcelayers.csv`. Se
 - Centros Integrarte (atención interna y externa)
 
 ### Secretaría de Educación (SED)
-- Colegios. Bogotá D.C. (oficiales y no oficiales)
+- Colegios. Bogotá D.C. (oficiales y no oficiales), desde el archivo más reciente de Datos Abiertos
 
 ### Secretaría General
 - Oferta de Discapacidad Bogotá (capa intersectorial consolidada)

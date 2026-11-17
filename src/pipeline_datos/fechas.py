@@ -4,7 +4,10 @@ Módulo: fechas.py
 Actualiza la columna 'Fecha de actualización' de sourcelayers.csv con la
 fecha de última actualización publicada por cada fuente.
 
-Orden de consulta por capa:
+Si la capa se descarga del archivo de Datos Abiertos ("Origen de descarga" =
+"datos abiertos"), se usa la fecha de ese archivo (el más reciente del dataset).
+
+Si no, orden de consulta por capa:
 1. Servicio ArcGIS REST: editingInfo.dataLastEditDate (o lastEditDate).
    Solo lo publican algunas capas (p. ej. FeatureServer de ArcGIS Online);
    los MapServer de SDIS y Catastro no lo exponen.
@@ -22,12 +25,16 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from .configuracion import COL_SOURCE_LAYER, COL_URL_SERVICIO_FEATURE
-from .ingesta import extraer_primera_url
+from .configuracion import (
+    COL_SOURCE_LAYER,
+    COL_URL_SERVICIO_FEATURE,
+    COL_URL_DATOS_ABIERTOS,
+    COL_ORIGEN_DESCARGA,
+)
+from .ingesta import extraer_primera_url, recurso_mas_reciente, es_origen_datos_abiertos
 
 
 COL_FECHA = "Fecha de actualización"
-COL_URL_DATOS_ABIERTOS = "URL Datos Abiertos de Bogotá"
 
 API_CKAN = "https://datosabiertos.bogota.gov.co/api/3/action/package_show"
 FORMATO_FECHA = "%d/%m/%Y"
@@ -45,6 +52,15 @@ def fecha_desde_arcgis(url_capa: str, sesion: requests.Session, timeout: int = 3
     if not ms:
         return None
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).date()
+
+
+def fecha_desde_archivo_datos_abiertos(url_dataset: str, sesion: requests.Session):
+    """Fecha del archivo descargable más reciente del dataset, o None."""
+    recurso = recurso_mas_reciente(url_dataset, sesion)
+    if recurso is None:
+        return None
+    fecha = recurso.get("last_modified") or recurso.get("created")
+    return datetime.fromisoformat(fecha).date() if fecha else None
 
 
 def fecha_desde_datos_abiertos(url_dataset: str, sesion: requests.Session, timeout: int = 30):
@@ -83,10 +99,13 @@ def actualizar_fechas_fuentes(ruta_csv: str | Path, escribir: bool = True) -> pd
         url_servicio = extraer_primera_url(row.get(COL_URL_SERVICIO_FEATURE))
         url_dataset = row.get(COL_URL_DATOS_ABIERTOS)
 
-        consultas = [
-            ("servicio ArcGIS", fecha_desde_arcgis, url_servicio),
-            ("Datos Abiertos", fecha_desde_datos_abiertos, url_dataset),
-        ]
+        if es_origen_datos_abiertos(row.get(COL_ORIGEN_DESCARGA)):
+            consultas = [("archivo Datos Abiertos", fecha_desde_archivo_datos_abiertos, url_dataset)]
+        else:
+            consultas = [
+                ("servicio ArcGIS", fecha_desde_arcgis, url_servicio),
+                ("Datos Abiertos", fecha_desde_datos_abiertos, url_dataset),
+            ]
         for nombre, consulta, url in consultas:
             if not url:
                 continue
@@ -118,5 +137,6 @@ def actualizar_fechas_fuentes(ruta_csv: str | Path, escribir: bool = True) -> pd
 __all__ = [
     "fecha_desde_arcgis",
     "fecha_desde_datos_abiertos",
+    "fecha_desde_archivo_datos_abiertos",
     "actualizar_fechas_fuentes",
 ]
